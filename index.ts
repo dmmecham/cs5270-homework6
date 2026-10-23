@@ -10,7 +10,7 @@ import {
     GetObjectCommand,
 } from "@aws-sdk/client-s3";
 
-import { Command } from "commander";
+import { Command, Option } from "commander";
 
 import winston from "winston";
 
@@ -30,10 +30,10 @@ program
   .version("0.0.1");
 
 program
-  .option("--request-bucket, -rb <bucket>", "Specify the request bucket name")
-  .option("--web-bucket, -wb <bucket>", "Specify the web bucket name")
-  .option("--polling-interval, -pi <ms>", "Specify the polling interval in milliseconds")
-  .option("--widgets-table, -wt <name>", "Specify the widgets table name")
+  .requiredOption("-rb, --request-bucket <bucket>", "Specify the request bucket name", "usu-cs5270-<unique id>-requests")
+  .requiredOption("-wb, --web-bucket <bucket>", "Specify the web bucket name", "usu-cs5270-<unique-id>-web")
+  .option(new Option("-pi, --polling-interval <ms>", "Specify the polling interval in milliseconds").defaultValue(100, "100 ms"))
+  .option("-wt, --widgets-table <name>", "Specify the widgets table name", "widgets");
 
 
 program.parse();
@@ -41,8 +41,8 @@ program.parse();
 
 const s3Client = new S3Client({});
 
-const bucketName = program.opts().requestBucket || "widget-tasks";
-const webBucketName = program.opts().webBucket || "widget-web";
+const requestsBucketName = program.opts().requestBucket;
+const webBucketName = program.opts().webBucket;
 const widgetsTableName = program.opts().widgetsTable || "widgets";
 
 const pollIntervalMs = parseInt(program.opts().pollingInterval) || 100;
@@ -55,22 +55,25 @@ function sleep(ms: number) {
 // S3 lists keys in ascending UTF-8 order, so MaxKeys: 1 yields the smallest.
 async function consumeOne(): Promise<boolean> {
   const list = await s3Client.send(
-    new ListObjectsV2Command({ Bucket: bucketName, MaxKeys: 1 }),
+    new ListObjectsV2Command({ Bucket: requestsBucketName, MaxKeys: 1 }),
   );
   const key = list.Contents?.[0]?.Key;
   if (!key) {
     return false;
   }
 
-  const response = await s3Client.send(new GetObjectCommand({ Bucket: bucketName, Key: key }));
+  const response = await s3Client.send(new GetObjectCommand({ Bucket: requestsBucketName, Key: key }));
   const body = await response.Body?.transformToString();
   logger.info(`Consumed widget request: ${key}`, { body });
 
-  await s3Client.send(new DeleteObjectCommand({ Bucket: bucketName, Key: key }));
+  await s3Client.send(new DeleteObjectCommand({ Bucket: requestsBucketName, Key: key }));
   return true;
 }
 
 async function main() {
+  if (!(requestsBucketName && webBucketName)) {
+    process.exit()
+  }
   logger.info("Starting to consume widget tasks from AWS S3...");
 
   while (true) {

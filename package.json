@@ -15,5 +15,8 @@
     "commander": "^15.0.0",
     "winston": "^3.19.0",
     "winston-cloudwatch": "^6.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5"
   }
 }
