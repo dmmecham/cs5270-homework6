@@ -13,6 +13,7 @@ import {
 import { Command, Option } from "commander";
 
 import winston from "winston";
+import { WidgetRequest } from "./Widget";
 
 const logger = winston.createLogger({
   level: "info",
@@ -51,9 +52,31 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/* HW7
+async function changeWidget(): Promise<boolean> {
+  
+}
+*/
+
+async function createWidget(widget: WidgetRequest): Promise<boolean> {
+  const response = await s3Client.send(new PutObjectCommand({
+    Body: JSON.stringify(widget),
+    Bucket: webBucketName,
+    ContentType: "application/json",
+    Key: widget.widgetId,
+  }));
+  return true;
+}
+
+/* HW7
+async function deleteWidget(): Promise<boolean> {
+  
+}
+*/
+
 // Reads and removes only the single request with the smallest key.
-// S3 lists keys in ascending UTF-8 order, so MaxKeys: 1 yields the smallest.
-async function consumeOne(): Promise<boolean> {
+// S3 lists keys in ascending UTF-8 order, so MaxKeys: 1 gets the smallest.
+async function consumeWidget(): Promise<boolean> {
   const list = await s3Client.send(
     new ListObjectsV2Command({ Bucket: requestsBucketName, MaxKeys: 1 }),
   );
@@ -79,7 +102,7 @@ async function main() {
   while (true) {
     let found = false;
     try {
-      found = await consumeOne();
+      found = await consumeWidget();
     } catch (error) {
       logger.error(`Error consuming widget task: ${error}`);
     }
