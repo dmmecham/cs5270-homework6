@@ -60,10 +60,20 @@ async function changeWidget(): Promise<boolean> {
 
 async function createWidget(widget: WidgetRequest): Promise<boolean> {
   const response = await s3Client.send(new PutObjectCommand({
-    Body: JSON.stringify(widget),
+    Body: JSON.stringify({
+      type: widget.type,
+      widgetId: widget.widgetId,
+      owner: widget.owner,
+      label: widget.label,
+      description: widget.description,
+    }),
     Bucket: webBucketName,
     ContentType: "application/json",
     Key: widget.widgetId,
+    Metadata: widget.otherAttributes?.reduce((metadata, attr) => {
+      metadata[attr.name] = attr.value;
+      return metadata;
+    }, {} as Record<string, string>),
   }));
   return true;
 }
