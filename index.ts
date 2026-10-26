@@ -8,6 +8,7 @@ import {
     DeleteBucketCommand,
     ListObjectsV2Command,
     GetObjectCommand,
+    DeleteObjectCommandOutput,
 } from "@aws-sdk/client-s3";
 
 import { Command, Option } from "commander";
@@ -86,18 +87,23 @@ async function deleteWidget(): Promise<boolean> {
 
 // Reads and removes only the single request with the smallest key.
 // S3 lists keys in ascending UTF-8 order, so MaxKeys: 1 gets the smallest.
-async function consumeWidget(): Promise<boolean> {
+async function consumeWidgetFromS3(): Promise<DeleteObjectCommandOutput> {
   const list = await s3Client.send(
     new ListObjectsV2Command({ Bucket: requestsBucketName, MaxKeys: 1 }),
   );
   const key = list.Contents?.[0]?.Key;
   if (!key) {
-    return false;
+    return {} as DeleteObjectCommandOutput;
   }
 
   const response = await s3Client.send(new GetObjectCommand({ Bucket: requestsBucketName, Key: key }));
   const body = await response.Body?.transformToString();
   logger.info(`Consumed widget request: ${key}`, { body });
+  await consumeWidget(key, body ?? "");
+  return await s3Client.send(new DeleteObjectCommand({ Bucket: requestsBucketName, Key: key }));
+}
+async function consumeWidget(key: string, body: string): Promise<boolean> {
+  
 
   // Invalid or unsupported requests are dropped so they don't block the queue.
   let request: WidgetRequest | undefined;
@@ -120,7 +126,6 @@ async function consumeWidget(): Promise<boolean> {
     }
   }
 
-  await s3Client.send(new DeleteObjectCommand({ Bucket: requestsBucketName, Key: key }));
   return true;
 }
 
@@ -133,7 +138,8 @@ async function main() {
   while (true) {
     let found = false;
     try {
-      found = await consumeWidget();
+      const result = await consumeWidgetFromS3();
+      found = !!result;
     } catch (error) {
       logger.error(`Error consuming widget task: ${error}`);
     }
