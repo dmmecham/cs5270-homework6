@@ -19,10 +19,16 @@ export interface WidgetRequest {
   otherAttributes?: WidgetAttribute[];
 }
 
-export const WIDGET_OWNER_PATTERN = new RegExp("[A-Za-z ]+");
+export const WIDGET_OWNER_PATTERN = new RegExp("^[A-Za-z ]+$");
 
-export function isValidWidgetRequest(value: WidgetRequest): value is WidgetRequest {
-  if (value !== "object" || value === null) {
+const widgetRequestTypes: readonly WidgetRequestType[] = [
+  "WidgetCreateRequest",
+  "WidgetDeleteRequest",
+  "WidgetUpdateRequest",
+];
+
+export function isValidWidgetRequest(value: unknown): value is WidgetRequest {
+  if (typeof value !== "object" || value === null) {
     return false;
   }
 
@@ -45,7 +51,7 @@ export function isValidWidgetRequest(value: WidgetRequest): value is WidgetReque
 
   if (
     typeof request.owner !== "string" ||
-    !/[A-Za-z ]+/.test(request.owner)
+    !WIDGET_OWNER_PATTERN.test(request.owner)
   ) {
     return false;
   }

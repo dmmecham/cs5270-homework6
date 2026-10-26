@@ -13,7 +13,7 @@ import {
 import { Command, Option } from "commander";
 
 import winston from "winston";
-import { WidgetRequest } from "./Widget";
+import { WidgetRequest, isValidWidgetRequest } from "./Widget.js";
 
 const logger = winston.createLogger({
   level: "info",
@@ -88,6 +88,27 @@ async function consumeWidget(): Promise<boolean> {
   const response = await s3Client.send(new GetObjectCommand({ Bucket: requestsBucketName, Key: key }));
   const body = await response.Body?.transformToString();
   logger.info(`Consumed widget request: ${key}`, { body });
+
+  // Invalid or unsupported requests are dropped so they don't block the queue.
+  let request: WidgetRequest | undefined;
+  try {
+    const parsed: unknown = JSON.parse(body ?? "");
+    if (isValidWidgetRequest(parsed)) {
+      request = parsed;
+    } else {
+      logger.warn(`Request ${key} failed validation; discarding`);
+    }
+  } catch {
+    logger.warn(`Request ${key} is not valid JSON; discarding`);
+  }
+
+  if (request) {
+    if (request.type === "WidgetCreateRequest") {
+      await createWidget(request);
+    } else {
+      logger.warn(`Request ${key} has unsupported type ${request.type}; discarding`);
+    }
+  }
 
   await s3Client.send(new DeleteObjectCommand({ Bucket: requestsBucketName, Key: key }));
   return true;
