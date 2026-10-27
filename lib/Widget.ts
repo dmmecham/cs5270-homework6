@@ -12,7 +12,10 @@ export interface WidgetAttribute {
 export type WidgetRequestType =
   | "WidgetCreateRequest"
   | "WidgetDeleteRequest"
-  | "WidgetUpdateRequest";
+  | "WidgetUpdateRequest"
+  | "create"
+  | "delete"
+  | "update";
 
 export interface WidgetRequest {
   type: WidgetRequestType;
@@ -49,6 +52,9 @@ const requestTypes: readonly string[] = [
   "WidgetCreateRequest",
   "WidgetDeleteRequest",
   "WidgetUpdateRequest",
+  "create",
+  "delete",
+  "update",
 ];
 const ownerPattern = /^[A-Za-z ]+$/;
 
@@ -58,10 +64,26 @@ function hasAnchoredFields(request: WidgetRequest): boolean {
   return requestTypes.includes(request.type) && ownerPattern.test(request.owner);
 }
 
+// Sample requests use the short type names (create/update/delete), which the
+// schema's type pattern does not accept, so the schema check sees the long name.
+const longTypeNames: Record<string, string> = {
+  create: "WidgetCreateRequest",
+  delete: "WidgetDeleteRequest",
+  update: "WidgetUpdateRequest",
+};
+
+function withSchemaTypeName(value: unknown): unknown {
+  if (typeof value !== "object" || value === null || !("type" in value)) {
+    return value;
+  }
+  const longName = longTypeNames[String(value.type)];
+  return longName === undefined ? value : { ...value, type: longName };
+}
+
 export function isValidWidgetRequest(value: unknown): value is WidgetRequest {
   return (
-    validateAgainstSchema(value) &&
-    hasAnchoredFields(value) &&
-    hasValidOtherAttributes(value)
+    validateAgainstSchema(withSchemaTypeName(value)) &&
+    hasAnchoredFields(value as WidgetRequest) &&
+    hasValidOtherAttributes(value as WidgetRequest)
   );
 }

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { isValidWidgetRequest } from "../lib/Widget.ts";
 
@@ -30,14 +31,42 @@ describe("isValidWidgetRequest", () => {
       "prefix-WidgetCreateRequest-suffix",
       "WidgetCreateRequest|WidgetDeleteRequest",
       "WidgetCreateRequestX",
+      "created",
+      "xcreate",
     ]) {
       assert.equal(isValidWidgetRequest({ ...baseRequest, type }), false, type);
     }
     for (const owner of ["A1", "Jane-Doe", "Jane\nDoe"]) {
       assert.equal(isValidWidgetRequest({ ...baseRequest, owner }), false, owner);
     }
-    for (const type of ["WidgetDeleteRequest", "WidgetUpdateRequest"]) {
+    for (const type of [
+      "WidgetDeleteRequest",
+      "WidgetUpdateRequest",
+      "create",
+      "update",
+      "delete",
+    ]) {
       assert.equal(isValidWidgetRequest({ ...baseRequest, type }), true, type);
+    }
+  });
+
+  it("validates the requests in the sample-requests directory", () => {
+    const dir = new URL("../../sample-requests/", import.meta.url);
+    if (!existsSync(dir)) {
+      return;
+    }
+    // These samples are deliberately invalid: type "bad" and no owner.
+    const invalidSamples = new Set(["1612306375135", "1612306375892"]);
+    for (const name of readdirSync(dir)) {
+      const text = readFileSync(new URL(name, dir), "utf8");
+      if (text.trim() === "") {
+        continue;
+      }
+      assert.equal(
+        isValidWidgetRequest(JSON.parse(text)),
+        !invalidSamples.has(name),
+        name,
+      );
     }
   });
 

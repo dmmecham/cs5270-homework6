@@ -38,6 +38,7 @@ export class WidgetProcessor {
 
     switch (request.type) {
       case "WidgetCreateRequest":
+      case "create":
         await this.createWidget(request);
         logger.info(`Created widget ${request.widgetId}`, {
           requestId: request.requestId,
