@@ -29,7 +29,7 @@ describe("S3RequestSource", () => {
     });
     mock.on(GetObjectCommand).resolves({
       Body: {
-        transformToString: async () => '{"type":"create"}',
+        transformToString: async () => '{"type":"WidgetCreateRequest"}',
       } as unknown as GetObjectCommandOutput["Body"],
       $metadata: {},
     });
@@ -39,7 +39,7 @@ describe("S3RequestSource", () => {
 
     assert.deepEqual(message, {
       key: "request-001",
-      body: '{"type":"create"}',
+      body: '{"type":"WidgetCreateRequest"}',
     });
     assert.deepEqual(mock.commandCalls(ListObjectsV2Command)[0].args[0].input, {
       Bucket: "requests",
@@ -58,6 +58,20 @@ describe("S3RequestSource", () => {
     const source = new S3RequestSource("requests", client);
     assert.equal(await source.receiveOne(), undefined);
     assert.equal(mock.commandCalls(GetObjectCommand).length, 0);
+  });
+
+  it("returns an empty body when the object has none", async () => {
+    const client = new S3Client({});
+    const mock = mockClient(client);
+    mocks.push(mock);
+    mock.on(ListObjectsV2Command).resolves({
+      Contents: [{ Key: "request-001" }],
+      $metadata: {},
+    });
+    mock.on(GetObjectCommand).resolves({ $metadata: {} });
+
+    const source = new S3RequestSource("requests", client);
+    assert.deepEqual(await source.receiveOne(), { key: "request-001", body: "" });
   });
 
   it("acknowledges a received request by deleting its S3 object", async () => {

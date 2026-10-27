@@ -1,19 +1,7 @@
 import { Command, InvalidArgumentError } from "commander";
-import winston from "winston";
-import {
-  S3RequestSource,
-  type WidgetMessage,
-} from "./lib/S3RequestSource.js";
+import { logger } from "./lib/logger.js";
+import { S3RequestSource } from "./lib/S3RequestSource.js";
 import { WidgetProcessor } from "./lib/WidgetProcessor.js";
-
-const logger = winston.createLogger({
-  level: "info",
-  format: winston.format.json(),
-  transports: [
-    new winston.transports.Console(),
-    new winston.transports.File({ filename: "consumer.log" }),
-  ],
-});
 
 function parsePollingInterval(value: string): number {
   const interval = Number(value);

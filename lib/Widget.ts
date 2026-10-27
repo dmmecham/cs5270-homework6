@@ -26,6 +26,7 @@ export interface WidgetRequest {
 
 const validateAgainstSchema = new Ajv.default({
   allErrors: true,
+  strictTuples: false,
 }).compile<WidgetRequest>(requestSchema);
 
 // The schema's tuple-style "items" only constrains the first otherAttributes

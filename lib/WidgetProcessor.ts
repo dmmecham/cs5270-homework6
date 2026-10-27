@@ -3,21 +3,12 @@ import {
   PutItemCommand,
   type AttributeValue,
 } from "@aws-sdk/client-dynamodb";
-import winston from "winston";
+import { logger } from "./logger.js";
 import {
   isValidWidgetRequest,
   type WidgetRequest,
 } from "./Widget.js";
 import type { WidgetMessage } from "./S3RequestSource.js";
-
-const logger = winston.createLogger({
-  level: "info",
-  format: winston.format.json(),
-  transports: [
-    new winston.transports.Console(),
-    new winston.transports.File({ filename: "consumer.log" }),
-  ],
-});
 
 export class WidgetProcessor {
   constructor(
@@ -49,10 +40,6 @@ export class WidgetProcessor {
         break;
       case "WidgetDeleteRequest":
       case "WidgetUpdateRequest":
-        logger.warn(
-          `Request ${message.key} has unsupported type ${request.type}; discarding`,
-        );
-        break;
       default:
         logger.warn(
           `Request ${message.key} has unsupported type ${request.type}; discarding`,
@@ -62,20 +49,22 @@ export class WidgetProcessor {
   }
 
   private async createWidget(widget: WidgetRequest): Promise<void> {
-    const item = Object.assign(Object.create(null), {
+    const item = Object.create(null) as Record<string, AttributeValue>;
+    for (const attribute of widget.otherAttributes ?? []) {
+      item[attribute.name] = { S: attribute.value };
+    }
+    // Set last so an otherAttribute can never overwrite a core widget field.
+    Object.assign(item, {
       type: { S: widget.type },
       requestId: { S: widget.requestId },
       widgetId: { S: widget.widgetId },
       owner: { S: widget.owner },
-    }) as Record<string, AttributeValue>;
+    });
     if (widget.label !== undefined) {
       item.label = { S: widget.label };
     }
     if (widget.description !== undefined) {
       item.description = { S: widget.description };
-    }
-    for (const attribute of widget.otherAttributes ?? []) {
-      item[attribute.name] = { S: attribute.value };
     }
 
     await this.dynamoDbClient.send(

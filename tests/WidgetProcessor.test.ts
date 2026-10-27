@@ -60,6 +60,33 @@ describe("WidgetProcessor", () => {
     });
   });
 
+  it("does not let otherAttributes overwrite core widget fields", async () => {
+    const client = new DynamoDBClient({});
+    const mock = mockClient(client);
+    mocks.push(mock);
+    mock.on(PutItemCommand).resolves({ $metadata: {} });
+
+    const processor = new WidgetProcessor("widgets", client);
+    await processor.processMessage({
+      key: "request-002",
+      body: JSON.stringify({
+        type: "WidgetCreateRequest",
+        requestId: "request-002",
+        widgetId: "widget-002",
+        owner: "Jane Doe",
+        otherAttributes: [
+          { name: "widgetId", value: "hijacked" },
+          { name: "owner", value: "Someone Else" },
+        ],
+      }),
+    });
+
+    const item = mock.commandCalls(PutItemCommand)[0].args[0].input.Item;
+    assert.deepEqual(item?.widgetId, { S: "widget-002" });
+    assert.deepEqual(item?.owner, { S: "Jane Doe" });
+    assert.equal(item?.label, undefined);
+  });
+
   it("does not write invalid JSON or requests rejected by the schema", async () => {
     const client = new DynamoDBClient({});
     const mock = mockClient(client);
