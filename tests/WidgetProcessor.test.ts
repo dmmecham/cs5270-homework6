@@ -22,7 +22,11 @@ describe("WidgetProcessor", () => {
     mocks.push(mock);
     mock.on(PutItemCommand).resolves({ $metadata: {} });
 
-    const processor = new WidgetProcessor("widgets", client);
+    const processor = new WidgetProcessor(
+      "widgets",
+      client,
+      () => new Date("2026-09-25T18:05:23.456Z"),
+    );
     await processor.processMessage({
       key: "request-001",
       body: JSON.stringify({
@@ -48,10 +52,9 @@ describe("WidgetProcessor", () => {
     }, {
       TableName: "widgets",
       Item: {
-        type: { S: "WidgetCreateRequest" },
-        requestId: { S: "request-001" },
-        widgetId: { S: "widget-001" },
+        id: { S: "widget-001" },
         owner: { S: "Jane Doe" },
+        last_modified_on: { S: "2026-09-25T18:05:23Z" },
         label: { S: "Example" },
         description: { S: "A widget" },
         color: { S: "blue" },
@@ -75,15 +78,17 @@ describe("WidgetProcessor", () => {
         widgetId: "widget-002",
         owner: "Jane Doe",
         otherAttributes: [
-          { name: "widgetId", value: "hijacked" },
+          { name: "id", value: "hijacked" },
           { name: "owner", value: "Someone Else" },
+          { name: "last_modified_on", value: "yesterday" },
         ],
       }),
     });
 
     const item = mock.commandCalls(PutItemCommand)[0].args[0].input.Item;
-    assert.deepEqual(item?.widgetId, { S: "widget-002" });
+    assert.deepEqual(item?.id, { S: "widget-002" });
     assert.deepEqual(item?.owner, { S: "Jane Doe" });
+    assert.match(item?.last_modified_on?.S ?? "", /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/);
     assert.equal(item?.label, undefined);
   });
 

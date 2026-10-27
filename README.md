@@ -11,7 +11,7 @@ For the S3 source, it polls an S3 bucket and processes each item one at a time i
 - [Node.js](https://nodejs.org/) 22.18 or newer (includes npm). Check with `node --version`. This is the minimum to run the TypeScript code without a separate compilation step.
 - An AWS account with:
   - an S3 bucket that holds the widget request JSON files, and
-  - a DynamoDB table whose partition key is the string attribute `widgetId`.
+  - a DynamoDB table whose partition key is the string attribute `id` (set from the request's `widgetId`).
 - AWS credentials and region available to the AWS SDK, for example via `aws configure`, or the environment variables `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, (optionally `AWS_SESSION_TOKEN`) and `AWS_REGION`.
   The credentials need `s3:ListBucket`, `s3:GetObject`, `s3:DeleteObject` on the request bucket and `dynamodb:PutItem` on the table.
 
@@ -95,7 +95,7 @@ Each S3 object must contain JSON matching [widgetRequest-schema.json](./widgetRe
 
 Invalid JSON or requests that fail validation are logged and discarded (they are still removed from the bucket).
 
-The stored DynamoDB item has the flat attributes `type`, `requestId`, `widgetId`, `owner`, optional `label` and `description`, and one string attribute per `otherAttributes` entry.
+The stored DynamoDB item has the flat attributes `id` (the request's `widgetId`), `owner`, `last_modified_on` (UTC timestamp), optional `label` and `description`, and one string attribute per `otherAttributes` entry.
 
 ## Logging
 

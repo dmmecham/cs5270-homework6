@@ -13,13 +13,16 @@ import type { WidgetMessage } from "./S3RequestSource.ts";
 export class WidgetProcessor {
   private readonly widgetsTable: string;
   private readonly dynamoDbClient: DynamoDBClient;
+  private readonly now: () => Date;
 
   constructor(
     widgetsTable: string,
     dynamoDbClient: DynamoDBClient = new DynamoDBClient({}),
+    now: () => Date = () => new Date(),
   ) {
     this.widgetsTable = widgetsTable;
     this.dynamoDbClient = dynamoDbClient;
+    this.now = now;
   }
 
   async processMessage(message: WidgetMessage): Promise<void> {
@@ -61,11 +64,12 @@ export class WidgetProcessor {
       item[attribute.name] = { S: attribute.value };
     }
     // Set last so an otherAttribute can never overwrite a core widget field.
+    // Matches the layout of existing items in the widgets table. The "owner"
+    // index uses last_modified_on (ISO UTC, no milliseconds) as its sort key.
     Object.assign(item, {
-      type: { S: widget.type },
-      requestId: { S: widget.requestId },
-      widgetId: { S: widget.widgetId },
+      id: { S: widget.widgetId },
       owner: { S: widget.owner },
+      last_modified_on: { S: this.now().toISOString().replace(/\.\d{3}Z$/, "Z") },
     });
     if (widget.label !== undefined) {
       item.label = { S: widget.label };
