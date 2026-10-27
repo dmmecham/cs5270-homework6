@@ -1,5 +1,5 @@
 import { Command, InvalidArgumentError } from "commander";
-import { logger } from "./lib/logger.ts";
+import { addLogFile, logger } from "./lib/logger.ts";
 import { S3RequestSource } from "./lib/S3RequestSource.ts";
 import { WidgetProcessor } from "./lib/WidgetProcessor.ts";
 
@@ -23,14 +23,19 @@ program
     "Polling interval in milliseconds",
     parsePollingInterval,
     100,
-  );
+  )
+  .option("-l, --log-file <path>", "File to write logs to (in addition to the console)");
 program.parse();
 
 const options = program.opts<{
   requestBucket: string;
   widgetsTable: string;
   pollingInterval: number;
+  logFile?: string;
 }>();
+if (options.logFile !== undefined) {
+  addLogFile(options.logFile);
+}
 
 const pollIntervalMs = options.pollingInterval;
 

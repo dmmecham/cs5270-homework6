@@ -26,7 +26,7 @@ npm ci
 ## Running
 
 ```
-node index.ts --request-bucket <bucket> [--widgets-table <name>] [--polling-interval <ms>]
+node index.ts --request-bucket <bucket> [--widgets-table <name>] [--polling-interval <ms>] [--log-file <path>]
 ```
 
 ### Arguments
@@ -36,6 +36,7 @@ node index.ts --request-bucket <bucket> [--widgets-table <name>] [--polling-inte
 | `--request-bucket <bucket>` | `-r` | Yes | none | S3 bucket to read widget requests from. |
 | `--widgets-table <name>` | `-t` | No | `widgets` | DynamoDB table that widgets are stored in. |
 | `--polling-interval <ms>` | `-p` | No | `100` | Milliseconds to wait before polling again when the bucket is empty or an error occurs. Must be a positive integer. |
+| `--log-file <path>` | `-l` | No | none | File to write logs to, in addition to the console. No log file is written unless this is given. Appended to if it already exists. |
 | `--version` | `-V` | No | | Print the version and exit. |
 | `--help` | `-h` | No | | Show usage and exit. |
 
@@ -64,7 +65,13 @@ node index.ts -r my-request-bucket -p 1000
 All options:
 
 ```powershell
-node index.ts -r my-request-bucket -t my-widgets -p 250
+node index.ts -r my-request-bucket -t my-widgets -p 250 -l logs/run1.log
+```
+
+Log to a specific file:
+
+```powershell
+node index.ts -r my-request-bucket --log-file consumer-test1.log
 ```
 
 Specify a region/profile for a single run:
@@ -99,7 +106,7 @@ The stored DynamoDB item has the flat attributes `id` (the request's `widgetId`)
 
 ## Logging
 
-Logs go to the console and to `consumer.log` in the directory the program is started from.
+Logs always go to the console. They are also written to a file only when `--log-file` is given. Logs are JSON, one entry per line.
 
 ## Tests
 
