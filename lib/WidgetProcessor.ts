@@ -20,9 +20,10 @@ const logger = winston.createLogger({
 });
 
 export class WidgetProcessor {
-  private readonly dynamoDbClient = new DynamoDBClient({});
-
-  constructor(private readonly widgetsTable: string) {}
+  constructor(
+    private readonly widgetsTable: string,
+    private readonly dynamoDbClient: DynamoDBClient = new DynamoDBClient({}),
+  ) {}
 
   async processMessage(message: WidgetMessage): Promise<void> {
     let request: unknown;
@@ -48,6 +49,11 @@ export class WidgetProcessor {
         break;
       case "WidgetDeleteRequest":
       case "WidgetUpdateRequest":
+        logger.warn(
+          `Request ${message.key} has unsupported type ${request.type}; discarding`,
+        );
+        break;
+      default:
         logger.warn(
           `Request ${message.key} has unsupported type ${request.type}; discarding`,
         );

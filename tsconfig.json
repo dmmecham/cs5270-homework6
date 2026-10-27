@@ -9,5 +9,5 @@
     "types": ["node"],
     "noEmit": true
   },
-  "include": ["*.ts", "lib/Widget.ts"]
+  "include": ["*.ts", "lib/**/*.ts", "tests/**/*.ts"]
 }
