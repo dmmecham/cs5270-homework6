@@ -18,16 +18,27 @@ describe("isValidWidgetRequest", () => {
     );
   });
 
-  it("accepts the request type and owner patterns as actually defined in the schema", () => {
-    assert.equal(
-      isValidWidgetRequest({
-        type: "prefix-WidgetCreateRequest-suffix",
-        requestId: "request-1",
-        widgetId: "widget-1",
-        owner: "A1",
-      }),
-      true,
-    );
+  it("requires the type and owner to match their patterns in full", () => {
+    const baseRequest = {
+      type: "WidgetCreateRequest",
+      requestId: "request-1",
+      widgetId: "widget-1",
+      owner: "Jane Doe",
+    };
+
+    for (const type of [
+      "prefix-WidgetCreateRequest-suffix",
+      "WidgetCreateRequest|WidgetDeleteRequest",
+      "WidgetCreateRequestX",
+    ]) {
+      assert.equal(isValidWidgetRequest({ ...baseRequest, type }), false, type);
+    }
+    for (const owner of ["A1", "Jane-Doe", "Jane\nDoe"]) {
+      assert.equal(isValidWidgetRequest({ ...baseRequest, owner }), false, owner);
+    }
+    for (const type of ["WidgetDeleteRequest", "WidgetUpdateRequest"]) {
+      assert.equal(isValidWidgetRequest({ ...baseRequest, type }), true, type);
+    }
   });
 
   it("rejects a request missing required properties", () => {

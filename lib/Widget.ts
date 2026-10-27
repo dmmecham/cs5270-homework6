@@ -45,6 +45,23 @@ function hasValidOtherAttributes(request: WidgetRequest): boolean {
   );
 }
 
+const requestTypes: readonly string[] = [
+  "WidgetCreateRequest",
+  "WidgetDeleteRequest",
+  "WidgetUpdateRequest",
+];
+const ownerPattern = /^[A-Za-z ]+$/;
+
+// The schema's "type" and "owner" patterns are unanchored, so they also
+// match values that merely contain a valid substring; require a full match.
+function hasAnchoredFields(request: WidgetRequest): boolean {
+  return requestTypes.includes(request.type) && ownerPattern.test(request.owner);
+}
+
 export function isValidWidgetRequest(value: unknown): value is WidgetRequest {
-  return validateAgainstSchema(value) && hasValidOtherAttributes(value);
+  return (
+    validateAgainstSchema(value) &&
+    hasAnchoredFields(value) &&
+    hasValidOtherAttributes(value)
+  );
 }
