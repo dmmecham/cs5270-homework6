@@ -3,18 +3,24 @@ import {
   PutItemCommand,
   type AttributeValue,
 } from "@aws-sdk/client-dynamodb";
-import { logger } from "./logger.js";
+import { logger } from "./logger.ts";
 import {
   isValidWidgetRequest,
   type WidgetRequest,
-} from "./Widget.js";
-import type { WidgetMessage } from "./S3RequestSource.js";
+} from "./Widget.ts";
+import type { WidgetMessage } from "./S3RequestSource.ts";
 
 export class WidgetProcessor {
+  private readonly widgetsTable: string;
+  private readonly dynamoDbClient: DynamoDBClient;
+
   constructor(
-    private readonly widgetsTable: string,
-    private readonly dynamoDbClient: DynamoDBClient = new DynamoDBClient({}),
-  ) {}
+    widgetsTable: string,
+    dynamoDbClient: DynamoDBClient = new DynamoDBClient({}),
+  ) {
+    this.widgetsTable = widgetsTable;
+    this.dynamoDbClient = dynamoDbClient;
+  }
 
   async processMessage(message: WidgetMessage): Promise<void> {
     let request: unknown;

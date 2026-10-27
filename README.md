@@ -8,7 +8,7 @@ For the S3 source, it polls an S3 bucket and processes each item one at a time i
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/) 22 or newer (includes npm). Check with `node --version`. This is the minimum to run the TypeScript code without a separate compilation step.
+- [Node.js](https://nodejs.org/) 22.18 or newer (includes npm). Check with `node --version`. This is the minimum to run the TypeScript code without a separate compilation step.
 - An AWS account with:
   - an S3 bucket that holds the widget request JSON files, and
   - a DynamoDB table whose partition key is the string attribute `widgetId`.
@@ -26,7 +26,7 @@ npm ci
 ## Running
 
 ```
-npx tsx index.ts --request-bucket <bucket> [--widgets-table <name>] [--polling-interval <ms>]
+node index.ts --request-bucket <bucket> [--widgets-table <name>] [--polling-interval <ms>]
 ```
 
 ### Arguments
@@ -46,31 +46,31 @@ Most options can be combined freely and in any order. For S3, `--request-bucket`
 Minimal (default table `widgets`, 100 ms polling):
 
 ```powershell
-npx tsx index.ts -r my-request-bucket
+node index.ts -r my-request-bucket
 ```
 
 Custom DynamoDB table:
 
 ```powershell
-npx tsx index.ts --request-bucket my-request-bucket --widgets-table my-widgets
+node index.ts --request-bucket my-request-bucket --widgets-table my-widgets
 ```
 
 Slower polling (1 second):
 
 ```powershell
-npx tsx index.ts -r my-request-bucket -p 1000
+node index.ts -r my-request-bucket -p 1000
 ```
 
 All options:
 
 ```powershell
-npx tsx index.ts -r my-request-bucket -t my-widgets -p 250
+node index.ts -r my-request-bucket -t my-widgets -p 250
 ```
 
 Specify a region/profile for a single run:
 
 ```powershell
-$env:AWS_REGION = "us-east-1"; $env:AWS_PROFILE = "default"; npx tsx index.ts -r my-request-bucket
+$env:AWS_REGION = "us-east-1"; $env:AWS_PROFILE = "default"; node index.ts -r my-request-bucket
 ```
 
 A missing `--request-bucket`, or a non-positive/non-numeric `--polling-interval`, prints an error and exits.

@@ -5,7 +5,7 @@ import {
   PutItemCommand,
 } from "@aws-sdk/client-dynamodb";
 import { mockClient } from "aws-sdk-client-mock";
-import { WidgetProcessor } from "../lib/WidgetProcessor.js";
+import { WidgetProcessor } from "../lib/WidgetProcessor.ts";
 
 describe("WidgetProcessor", () => {
   const mocks: ReturnType<typeof mockClient>[] = [];

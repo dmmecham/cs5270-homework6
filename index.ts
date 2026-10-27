@@ -1,7 +1,7 @@
 import { Command, InvalidArgumentError } from "commander";
-import { logger } from "./lib/logger.js";
-import { S3RequestSource } from "./lib/S3RequestSource.js";
-import { WidgetProcessor } from "./lib/WidgetProcessor.js";
+import { logger } from "./lib/logger.ts";
+import { S3RequestSource } from "./lib/S3RequestSource.ts";
+import { WidgetProcessor } from "./lib/WidgetProcessor.ts";
 
 function parsePollingInterval(value: string): number {
   const interval = Number(value);

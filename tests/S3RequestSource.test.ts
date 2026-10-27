@@ -8,7 +8,7 @@ import {
   type GetObjectCommandOutput,
 } from "@aws-sdk/client-s3";
 import { mockClient } from "aws-sdk-client-mock";
-import { S3RequestSource } from "../lib/S3RequestSource.js";
+import { S3RequestSource } from "../lib/S3RequestSource.ts";
 
 describe("S3RequestSource", () => {
   const mocks: ReturnType<typeof mockClient>[] = [];

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { isValidWidgetRequest } from "../lib/Widget.js";
+import { isValidWidgetRequest } from "../lib/Widget.ts";
 
 describe("isValidWidgetRequest", () => {
   it("accepts a create request matching the schema", () => {

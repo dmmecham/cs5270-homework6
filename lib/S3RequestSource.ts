@@ -16,10 +16,13 @@ export interface RequestSource {
 }
 
 export class S3RequestSource implements RequestSource {
-  constructor(
-    private readonly requestBucket: string,
-    private readonly s3Client: S3Client = new S3Client({}),
-  ) {}
+  private readonly requestBucket: string;
+  private readonly s3Client: S3Client;
+
+  constructor(requestBucket: string, s3Client: S3Client = new S3Client({})) {
+    this.requestBucket = requestBucket;
+    this.s3Client = s3Client;
+  }
 
   async receiveOne(): Promise<WidgetMessage | undefined> {
     const list = await this.s3Client.send(
