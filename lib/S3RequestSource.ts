@@ -4,6 +4,7 @@ import {
   ListObjectsV2Command,
   S3Client,
 } from "@aws-sdk/client-s3";
+import { addAbortSignal, Readable } from "node:stream";
 
 export interface WidgetMessage {
   key: string;
@@ -11,7 +12,7 @@ export interface WidgetMessage {
 }
 
 export interface RequestSource {
-  receiveOne(): Promise<WidgetMessage | undefined>;
+  receiveOne(signal?: AbortSignal): Promise<WidgetMessage | undefined>;
   acknowledge(message: WidgetMessage): Promise<void>;
 }
 
@@ -24,12 +25,13 @@ export class S3RequestSource implements RequestSource {
     this.s3Client = s3Client;
   }
 
-  async receiveOne(): Promise<WidgetMessage | undefined> {
+  async receiveOne(signal?: AbortSignal): Promise<WidgetMessage | undefined> {
     const list = await this.s3Client.send(
       new ListObjectsV2Command({
         Bucket: this.requestBucket,
         MaxKeys: 1,
       }),
+      { abortSignal: signal },
     );
     const key = list.Contents?.[0]?.Key;
     if (!key) {
@@ -38,7 +40,11 @@ export class S3RequestSource implements RequestSource {
 
     const response = await this.s3Client.send(
       new GetObjectCommand({ Bucket: this.requestBucket, Key: key }),
+      { abortSignal: signal },
     );
+    if (signal && response.Body instanceof Readable) {
+      addAbortSignal(signal, response.Body);
+    }
     const body = await response.Body?.transformToString();
     return { key, body: body ?? "" };
   }

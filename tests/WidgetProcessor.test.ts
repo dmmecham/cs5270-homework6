@@ -6,6 +6,7 @@ import {
 } from "@aws-sdk/client-dynamodb";
 import { mockClient } from "aws-sdk-client-mock";
 import { WidgetProcessor } from "../lib/WidgetProcessor.ts";
+import { DynamoDBWidgetStorage } from "../lib/WidgetStorage.ts";
 
 describe("WidgetProcessor", () => {
   const mocks: ReturnType<typeof mockClient>[] = [];
@@ -22,11 +23,11 @@ describe("WidgetProcessor", () => {
     mocks.push(mock);
     mock.on(PutItemCommand).resolves({ $metadata: {} });
 
-    const processor = new WidgetProcessor(
+    const processor = new WidgetProcessor(new DynamoDBWidgetStorage(
       "widgets",
       client,
       () => new Date("2026-09-25T18:05:23.456Z"),
-    );
+    ));
     await processor.processMessage({
       key: "request-001",
       body: JSON.stringify({
@@ -69,7 +70,7 @@ describe("WidgetProcessor", () => {
     mocks.push(mock);
     mock.on(PutItemCommand).resolves({ $metadata: {} });
 
-    const processor = new WidgetProcessor("widgets", client);
+    const processor = new WidgetProcessor(new DynamoDBWidgetStorage("widgets", client));
     await processor.processMessage({
       key: "request-002",
       body: JSON.stringify({
@@ -96,7 +97,7 @@ describe("WidgetProcessor", () => {
     const client = new DynamoDBClient({});
     const mock = mockClient(client);
     mocks.push(mock);
-    const processor = new WidgetProcessor("widgets", client);
+    const processor = new WidgetProcessor(new DynamoDBWidgetStorage("widgets", client));
 
     await processor.processMessage({ key: "bad-json", body: "{" });
     await processor.processMessage({
@@ -111,7 +112,7 @@ describe("WidgetProcessor", () => {
     const client = new DynamoDBClient({});
     const mock = mockClient(client);
     mocks.push(mock);
-    const processor = new WidgetProcessor("widgets", client);
+    const processor = new WidgetProcessor(new DynamoDBWidgetStorage("widgets", client));
 
     for (const type of ["WidgetDeleteRequest", "WidgetUpdateRequest"]) {
       await processor.processMessage({
@@ -132,7 +133,7 @@ describe("WidgetProcessor", () => {
     const client = new DynamoDBClient({});
     const mock = mockClient(client);
     mocks.push(mock);
-    const processor = new WidgetProcessor("widgets", client);
+    const processor = new WidgetProcessor(new DynamoDBWidgetStorage("widgets", client));
 
     await processor.processMessage({
       key: "malformed-attributes",
@@ -157,7 +158,7 @@ describe("WidgetProcessor", () => {
     mocks.push(mock);
     const error = new Error("DynamoDB unavailable");
     mock.on(PutItemCommand).rejects(error);
-    const processor = new WidgetProcessor("widgets", client);
+    const processor = new WidgetProcessor(new DynamoDBWidgetStorage("widgets", client));
 
     await assert.rejects(
       processor.processMessage({

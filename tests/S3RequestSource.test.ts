@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
+import { Readable } from "node:stream";
 import {
   DeleteObjectCommand,
   GetObjectCommand,
@@ -98,5 +99,33 @@ describe("S3RequestSource", () => {
 
     const source = new S3RequestSource("requests", client);
     await assert.rejects(source.receiveOne(), error);
+  });
+
+  it("passes the abort signal to S3 and cancels an in-progress body read", async () => {
+    const client = new S3Client({});
+    const mock = mockClient(client);
+    mocks.push(mock);
+    mock.on(ListObjectsV2Command).resolves({ Contents: [{ Key: "request" }] });
+    const body = new Readable({ read() {} });
+    const sdkBody = Object.assign(body, {
+      async transformToString() {
+        let text = "";
+        for await (const chunk of body) text += chunk.toString();
+        return text;
+      },
+    });
+    mock.on(GetObjectCommand).resolves({
+      Body: sdkBody as unknown as GetObjectCommandOutput["Body"],
+    });
+
+    const controller = new AbortController();
+    const receive = new S3RequestSource("requests", client).receiveOne(controller.signal);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    const listArgs: readonly unknown[] = mock.commandCalls(ListObjectsV2Command)[0].args;
+    const getArgs: readonly unknown[] = mock.commandCalls(GetObjectCommand)[0].args;
+    assert.deepEqual(listArgs[1], { abortSignal: controller.signal });
+    assert.deepEqual(getArgs[1], { abortSignal: controller.signal });
+    controller.abort();
+    await assert.rejects(receive, { name: "AbortError" });
   });
 });
