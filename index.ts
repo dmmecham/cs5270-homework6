@@ -1,6 +1,8 @@
 import { Command, InvalidArgumentError } from "commander";
 import { addLogFile, logger } from "./lib/logger.ts";
 import { S3RequestSource } from "./lib/S3RequestSource.ts";
+import type { RequestSource } from "./lib/S3RequestSource.ts";
+import { SQSRequestSource } from "./lib/SQSRequestSource.ts";
 import { WidgetProcessor } from "./lib/WidgetProcessor.ts";
 import { DynamoDBWidgetStorage, S3WidgetStorage } from "./lib/WidgetStorage.ts";
 import { consumeRequests } from "./lib/Consumer.ts";
@@ -18,7 +20,8 @@ program
   .name("cs5270-consumer")
   .description("Consumes widget tasks from AWS")
   .version("0.0.1")
-  .requiredOption("-r, --request-bucket <bucket>", "S3 bucket containing requests")
+  .option("-r, --request-bucket <bucket>", "S3 bucket containing requests")
+  .option("-q, --request-queue <name>", "SQS queue containing requests")
   .option("-s, --storage <type>", "Widget storage: dynamodb or s3", "dynamodb")
   .option("-t, --widgets-table <name>", "DynamoDB widgets table", "widgets")
   .option("-b, --widget-bucket <bucket>", "S3 bucket for stored widgets")
@@ -32,13 +35,17 @@ program
 program.parse();
 
 const options = program.opts<{
-  requestBucket: string;
+  requestBucket?: string;
+  requestQueue?: string;
   storage: string;
   widgetsTable: string;
   widgetBucket?: string;
   pollingInterval: number;
   logFile?: string;
 }>();
+if (!!options.requestBucket === !!options.requestQueue) {
+  program.error("Specify exactly one of --request-bucket or --request-queue");
+}
 if (options.storage !== "dynamodb" && options.storage !== "s3") {
   program.error("--storage must be dynamodb or s3");
 }
@@ -58,7 +65,10 @@ if (options.logFile !== undefined) {
 }
 
 async function main(): Promise<void> {
-  const requestSource = new S3RequestSource(options.requestBucket);
+  let requestSource: RequestSource;
+  if (options.requestQueue) requestSource = new SQSRequestSource(options.requestQueue);
+  else if (options.requestBucket) requestSource = new S3RequestSource(options.requestBucket);
+  else throw new Error("No request source specified");
   const storage = options.storage === "s3" && options.widgetBucket !== undefined
     ? new S3WidgetStorage(options.widgetBucket)
     : new DynamoDBWidgetStorage(options.widgetsTable);
@@ -72,7 +82,7 @@ async function main(): Promise<void> {
   };
   process.on("SIGINT", stop);
   process.on("SIGTERM", stop);
-  logger.info("Starting to consume widget tasks from AWS S3...");
+  logger.info(`Starting to consume widget tasks from ${options.requestQueue ? "SQS" : "S3"}...`);
 
   try {
     await consumeRequests(requestSource, widgetProcessor, options.pollingInterval, controller.signal);

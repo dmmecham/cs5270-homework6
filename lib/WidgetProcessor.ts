@@ -1,5 +1,5 @@
 import { logger } from "./logger.ts";
-import { isValidWidgetRequest } from "./Widget.ts";
+import { isValidWidgetRequest, widgetRequestValidationError } from "./Widget.ts";
 import type { WidgetMessage } from "./S3RequestSource.ts";
 import type { WidgetStorage } from "./WidgetStorage.ts";
 
@@ -20,26 +20,43 @@ export class WidgetProcessor {
     }
 
     if (!isValidWidgetRequest(request)) {
-      logger.warn(`Request ${message.key} failed validation; discarding`);
+      logger.warn(`Request ${message.key} failed validation; discarding`, {
+        reason: widgetRequestValidationError(request),
+      });
       return;
     }
 
-    switch (request.type) {
-      case "WidgetCreateRequest":
-      case "create":
-        await this.storage.create(request);
-        logger.info(`Created widget ${request.widgetId}`, {
-          requestId: request.requestId,
-        });
-        break;
-      case "WidgetDeleteRequest":
-      case "WidgetUpdateRequest":
-      default:
-        logger.warn(
-          `Request ${message.key} has unsupported type ${request.type}; discarding`,
-        );
-        break;
+    try {
+      switch (request.type) {
+        case "WidgetCreateRequest":
+        case "create":
+          await this.storage.create(request);
+          logger.info(`Created widget ${request.widgetId}`, { requestId: request.requestId });
+          break;
+        case "WidgetUpdateRequest":
+        case "update":
+          if (await this.storage.update(request)) {
+            logger.info(`Updated widget ${request.widgetId}`, { requestId: request.requestId });
+          } else {
+            logger.warn(`Widget ${request.widgetId} not found or owner mismatch; update skipped`, { requestId: request.requestId });
+          }
+          break;
+        case "WidgetDeleteRequest":
+        case "delete":
+          if (await this.storage.delete(request)) {
+            logger.info(`Deleted widget ${request.widgetId}`, { requestId: request.requestId });
+          } else {
+            logger.warn(`Widget ${request.widgetId} not found or owner mismatch; delete skipped`, { requestId: request.requestId });
+          }
+          break;
+      }
+    } catch (error) {
+      logger.error(`Request ${message.key} failed`, {
+        requestId: request.requestId,
+        type: request.type,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
     }
   }
-
 }

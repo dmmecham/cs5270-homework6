@@ -6,7 +6,7 @@ const requestSchema = JSON.parse(readFileSync(schemaUrl, "utf8"));
 
 export interface WidgetAttribute {
   name: string;
-  value: string;
+  value: string | null;
 }
 
 export type WidgetRequestType =
@@ -22,29 +22,31 @@ export interface WidgetRequest {
   requestId: string;
   widgetId: string;
   owner: string;
-  label?: string;
-  description?: string;
-  otherAttributes?: WidgetAttribute[];
+  label?: string | null;
+  description?: string | null;
+  otherAttributes?: WidgetAttribute[] | null;
 }
 
-const validateAgainstSchema = new Ajv.default({
+const ajv = new Ajv.default({
   allErrors: true,
   strictTuples: false,
-}).compile<WidgetRequest>(requestSchema);
+});
+const validateAgainstSchema = ajv.compile<WidgetRequest>(requestSchema);
 
 // The schema's tuple-style "items" only constrains the first otherAttributes
 // entry, so every entry is checked here as well.
 function hasValidOtherAttributes(request: WidgetRequest): boolean {
-  return (
-    request.otherAttributes === undefined ||
-    request.otherAttributes.every(
-      (attribute) =>
-        typeof attribute === "object" &&
-        attribute !== null &&
-        typeof attribute.name === "string" &&
-        attribute.name.length > 0 &&
-        typeof attribute.value === "string",
-    )
+  const isUpdate = request.type === "update" || request.type === "WidgetUpdateRequest";
+  if (request.otherAttributes == null) {
+    return request.otherAttributes === undefined || isUpdate;
+  }
+  return request.otherAttributes.every(
+    (attribute) =>
+      typeof attribute === "object" &&
+      attribute !== null &&
+      typeof attribute.name === "string" &&
+      attribute.name.length > 0 &&
+      (typeof attribute.value === "string" || (isUpdate && attribute.value === null)),
   );
 }
 
@@ -72,18 +74,41 @@ const longTypeNames: Record<string, string> = {
   update: "WidgetUpdateRequest",
 };
 
-function withSchemaTypeName(value: unknown): unknown {
+function forSchemaValidation(value: unknown): unknown {
   if (typeof value !== "object" || value === null || !("type" in value)) {
     return value;
   }
-  const longName = longTypeNames[String(value.type)];
-  return longName === undefined ? value : { ...value, type: longName };
+  const type = value.type;
+  const normalized: Record<string, unknown> = { ...value };
+  if (typeof type === "string" && Object.hasOwn(longTypeNames, type)) {
+    normalized.type = longTypeNames[type];
+  }
+  if (type === "update" || type === "WidgetUpdateRequest") {
+    if (normalized.label === null) delete normalized.label;
+    if (normalized.description === null) delete normalized.description;
+    if (normalized.otherAttributes === null) delete normalized.otherAttributes;
+    if (Array.isArray(normalized.otherAttributes)) {
+      normalized.otherAttributes = normalized.otherAttributes.map((attribute: unknown) =>
+        typeof attribute === "object" && attribute !== null &&
+        "value" in attribute && attribute.value === null
+          ? { ...attribute, value: "" }
+          : attribute,
+      );
+    }
+  }
+  return normalized;
+}
+
+export function widgetRequestValidationError(value: unknown): string | undefined {
+  if (!validateAgainstSchema(forSchemaValidation(value))) {
+    return ajv.errorsText(validateAgainstSchema.errors);
+  }
+  const request = value as WidgetRequest;
+  if (!hasAnchoredFields(request)) return "invalid request type or owner";
+  if (!hasValidOtherAttributes(request)) return "invalid otherAttributes";
+  return undefined;
 }
 
 export function isValidWidgetRequest(value: unknown): value is WidgetRequest {
-  return (
-    validateAgainstSchema(withSchemaTypeName(value)) &&
-    hasAnchoredFields(value as WidgetRequest) &&
-    hasValidOtherAttributes(value as WidgetRequest)
-  );
+  return widgetRequestValidationError(value) === undefined;
 }

@@ -18,20 +18,24 @@ export async function consumeRequests(
     while (!waitSignal.aborted) {
       let received = false;
       let failed = false;
+      let requestKey: string | undefined;
       try {
         const message = await source.receiveOne(waitSignal);
         if (waitSignal.aborted) break;
         if (message) {
           received = true;
+          requestKey = message.key;
           clearTimeout(idleTimer);
-          await source.acknowledge(message);
+          if (!source.acknowledgeAfterProcessing) await source.acknowledge(message);
           await processor.processMessage(message);
+          if (source.acknowledgeAfterProcessing) await source.acknowledge(message);
         }
       } catch (error) {
         failed = true;
         if (!(waitSignal.aborted && error instanceof Error && error.name === "AbortError")) {
           logger.error("Error consuming widget task", {
             error: error instanceof Error ? error.message : String(error),
+            ...(requestKey !== undefined && { requestKey }),
           });
         }
       }

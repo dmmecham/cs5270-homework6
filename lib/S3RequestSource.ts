@@ -9,9 +9,11 @@ import { addAbortSignal, Readable } from "node:stream";
 export interface WidgetMessage {
   key: string;
   body: string;
+  receiptHandle?: string;
 }
 
 export interface RequestSource {
+  readonly acknowledgeAfterProcessing?: boolean;
   receiveOne(signal?: AbortSignal): Promise<WidgetMessage | undefined>;
   acknowledge(message: WidgetMessage): Promise<void>;
 }
