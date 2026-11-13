@@ -108,13 +108,34 @@ describe("WidgetProcessor", () => {
     assert.equal(mock.commandCalls(PutItemCommand).length, 0);
   });
 
-  it("discards update and delete requests until those actions are supported", async () => {
+  it("does not process requests with an empty widget ID", async () => {
+    const actions: string[] = [];
+    const processor = new WidgetProcessor({
+      async create() { actions.push("create"); },
+      async update() { actions.push("update"); return true; },
+      async delete() { actions.push("delete"); return true; },
+    });
+    for (const type of ["create", "update", "delete"]) {
+      await processor.processMessage({
+        key: type,
+        body: JSON.stringify({ type, requestId: "r", widgetId: "", owner: "Jane Doe" }),
+      });
+    }
+    assert.deepEqual(actions, []);
+  });
+
+  it("routes update and delete requests to the storage backend", async () => {
     const client = new DynamoDBClient({});
     const mock = mockClient(client);
     mocks.push(mock);
-    const processor = new WidgetProcessor(new DynamoDBWidgetStorage("widgets", client));
+    const actions: string[] = [];
+    const processor = new WidgetProcessor({
+      async create() { actions.push("create"); },
+      async update() { actions.push("update"); return true; },
+      async delete() { actions.push("delete"); return true; },
+    });
 
-    for (const type of ["WidgetDeleteRequest", "WidgetUpdateRequest"]) {
+    for (const type of ["WidgetDeleteRequest", "WidgetUpdateRequest", "delete", "update"]) {
       await processor.processMessage({
         key: `${type}-request`,
         body: JSON.stringify({
@@ -126,6 +147,7 @@ describe("WidgetProcessor", () => {
       });
     }
 
+    assert.deepEqual(actions, ["delete", "update", "delete", "update"]);
     assert.equal(mock.commandCalls(PutItemCommand).length, 0);
   });
 

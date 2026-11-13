@@ -40,14 +40,19 @@ function hasValidOtherAttributes(request: WidgetRequest): boolean {
   if (request.otherAttributes == null) {
     return request.otherAttributes === undefined || isUpdate;
   }
-  return request.otherAttributes.every(
-    (attribute) =>
-      typeof attribute === "object" &&
-      attribute !== null &&
-      typeof attribute.name === "string" &&
-      attribute.name.length > 0 &&
-      (typeof attribute.value === "string" || (isUpdate && attribute.value === null)),
-  );
+  for (const attribute of request.otherAttributes) {
+    if (
+      typeof attribute !== "object" ||
+      attribute === null ||
+      Array.isArray(attribute) ||
+      typeof attribute.name !== "string" ||
+      attribute.name.length === 0 ||
+      (typeof attribute.value !== "string" && !(isUpdate && attribute.value === null))
+    ) {
+      return false;
+    }
+  }
+  return true;
 }
 
 const requestTypes: readonly string[] = [
@@ -75,7 +80,7 @@ const longTypeNames: Record<string, string> = {
 };
 
 function forSchemaValidation(value: unknown): unknown {
-  if (typeof value !== "object" || value === null || !("type" in value)) {
+  if (typeof value !== "object" || value === null || Array.isArray(value) || !("type" in value)) {
     return value;
   }
   const type = value.type;
@@ -105,6 +110,7 @@ export function widgetRequestValidationError(value: unknown): string | undefined
   }
   const request = value as WidgetRequest;
   if (!hasAnchoredFields(request)) return "invalid request type or owner";
+  if (request.widgetId.length === 0) return "widgetId must not be empty";
   if (!hasValidOtherAttributes(request)) return "invalid otherAttributes";
   return undefined;
 }

@@ -122,6 +122,8 @@ Each S3 object or SQS message body contains a JSON request based on [widgetReque
 
 The `type` can also be `create`, `update`, or `delete`, or the corresponding `WidgetCreateRequest`, `WidgetUpdateRequest`, or `WidgetDeleteRequest`. Updates leave omitted or null fields unchanged. An empty `label` or `description` sets it to null; an empty other-attribute value removes that attribute. Widget ID and owner cannot be changed. Updates and deletes of missing widgets (or an owner mismatch) are logged as warnings.
 
+The widget ID must be nonempty, including when using the short request types; DynamoDB cannot use an empty partition key.
+
 For DynamoDB updates, `otherAttributes` cannot target the reserved names `id`, `owner`, `last_modified_on`, `label`, or `description`; use the top-level fields for `label` and `description`.
 
 Invalid JSON or requests that fail validation are logged and discarded.

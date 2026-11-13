@@ -138,4 +138,97 @@ describe("isValidWidgetRequest", () => {
       false,
     );
   });
+
+  it("accepts null update fields as no-ops but rejects them for creation", () => {
+    const request = {
+      requestId: "r", widgetId: "w", owner: "Jane Doe",
+      label: null, description: null, otherAttributes: [{ name: "color", value: null }],
+    };
+    assert.equal(isValidWidgetRequest({ ...request, type: "update" }), true);
+    assert.equal(isValidWidgetRequest({ ...request, type: "WidgetUpdateRequest" }), true);
+    assert.equal(isValidWidgetRequest({ ...request, type: "update", otherAttributes: null }), true);
+    assert.equal(isValidWidgetRequest({ ...request, type: "create", otherAttributes: null }), false);
+    assert.equal(isValidWidgetRequest({ ...request, type: "create" }), false);
+    assert.equal(isValidWidgetRequest({
+      ...request, type: "update", otherAttributes: [{ name: "color", value: 3 }],
+    }), false);
+  });
+
+  it("rejects non-objects and invalid or missing required fields", () => {
+    const request = { type: "create", requestId: "r", widgetId: "w", owner: "Jane Doe" };
+    const arrayWithProperties = Object.assign([], request);
+    for (const input of [null, [], arrayWithProperties, "request", 0, true]) {
+      assert.equal(isValidWidgetRequest(input), false);
+    }
+    for (const name of ["type", "requestId", "widgetId", "owner"] as const) {
+      const input: Partial<typeof request> = { ...request };
+      delete input[name];
+      assert.equal(isValidWidgetRequest(input), false, `missing ${name}`);
+    }
+    for (const input of [
+      { ...request, type: null },
+      { ...request, requestId: 12 },
+      { ...request, widgetId: null },
+      { ...request, widgetId: "" },
+      { ...request, owner: 42 },
+      { ...request, owner: "" },
+    ]) {
+      assert.equal(isValidWidgetRequest(input), false, JSON.stringify(input));
+    }
+    for (const type of ["create", "update", "delete"]) {
+      assert.equal(isValidWidgetRequest({ ...request, type, widgetId: "" }), false, type);
+    }
+    assert.equal(isValidWidgetRequest({ ...request, requestId: "" }), true);
+  });
+
+  it("rejects invalid owner characters and malformed optional properties", () => {
+    const request = { type: "create", requestId: "r", widgetId: "w", owner: "Jane Doe" };
+    for (const owner of ["Jane Doe\n", "Jane Doe\r\n", "Jane\tDoe", "Jane\u2028Doe", "José"]) {
+      assert.equal(isValidWidgetRequest({ ...request, owner }), false, JSON.stringify(owner));
+    }
+    for (const input of [
+      { ...request, label: null },
+      { ...request, description: false },
+      { ...request, otherAttributes: {} },
+      { ...request, otherAttributes: "color" },
+      { ...request, type: "update", label: 1 },
+      { ...request, type: "update", description: [] },
+    ]) {
+      assert.equal(isValidWidgetRequest(input), false, JSON.stringify(input));
+    }
+    assert.equal(isValidWidgetRequest({ ...request, label: "", description: "", otherAttributes: [] }), true);
+  });
+
+  it("validates the shape of every nested attribute, including update nulls", () => {
+    const request = { type: "create", requestId: "r", widgetId: "w", owner: "Jane Doe" };
+    const valid = { name: "color", value: "blue" };
+    for (const attribute of [
+      null, [], "attribute", { value: "x" }, { name: "color" },
+      { name: "", value: "x" }, { name: 7, value: "x" },
+      { name: "color", value: 7 }, { name: "color", value: null },
+    ]) {
+      assert.equal(
+        isValidWidgetRequest({ ...request, otherAttributes: [valid, attribute] }),
+        false,
+        JSON.stringify(attribute),
+      );
+    }
+    for (const type of ["update", "WidgetUpdateRequest"]) {
+      assert.equal(isValidWidgetRequest({
+        ...request, type, otherAttributes: [valid, { name: "color", value: null }],
+      }), true);
+      assert.equal(isValidWidgetRequest({
+        ...request, type, otherAttributes: [valid, { name: "color" }],
+      }), false);
+    }
+    const arrayWithProperties = Object.assign([], { name: "color", value: "red" });
+    assert.equal(isValidWidgetRequest({
+      ...request, otherAttributes: [valid, arrayWithProperties],
+    }), false);
+    const sparse = [valid, ,];
+    assert.equal(isValidWidgetRequest({ ...request, otherAttributes: sparse }), false);
+    assert.equal(isValidWidgetRequest({
+      ...request, extra: "allowed", otherAttributes: [{ ...valid, extra: "allowed" }],
+    }), true);
+  });
 });

@@ -98,6 +98,37 @@ describe("polling consumer", () => {
     assert.deepEqual(events, ["receive", "acknowledge", "process"]);
   });
 
+  it("acknowledges queue messages only after processing, even if stopped during processing", async () => {
+    const controller = new AbortController();
+    const events: string[] = [];
+    await consumeRequests({
+      acknowledgeAfterProcessing: true,
+      async receiveOne() { events.push("receive"); return { key: "first", body: "{}" }; },
+      async acknowledge() { events.push("acknowledge"); },
+    }, {
+      async processMessage() { events.push("process"); controller.abort(); },
+    }, 100, controller.signal);
+    assert.deepEqual(events, ["receive", "process", "acknowledge"]);
+  });
+
+  it("does not delete a queue message when processing fails", async () => {
+    const controller = new AbortController();
+    let reads = 0;
+    let acknowledgements = 0;
+    await consumeRequests({
+      acknowledgeAfterProcessing: true,
+      async receiveOne() {
+        if (++reads === 2) { controller.abort(); return undefined; }
+        return { key: "first", body: "{}" };
+      },
+      async acknowledge() { acknowledgements++; },
+    }, {
+      async processMessage() { throw new Error("storage failed"); },
+    }, 1, controller.signal);
+    assert.equal(reads, 2);
+    assert.equal(acknowledgements, 0);
+  });
+
   it("stops at 30 seconds of inactivity even when the polling interval is longer", async (t) => {
     t.mock.timers.enable({ apis: ["setTimeout"] });
     let finished = false;

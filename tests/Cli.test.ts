@@ -17,8 +17,66 @@ it("rejects invalid storage choices and incompatible resource arguments", () => 
     const result = spawnSync(process.execPath, ["index.ts", "-r", "requests", ...args], {
       encoding: "utf8",
     });
+
     assert.equal(result.status, 1, args.join(" "));
     assert.match(result.stderr, error);
+  }
+});
+
+it("requires exactly one request source", () => {
+  for (const args of [[], ["-r", "requests", "-q", "queue"]]) {
+    const result = spawnSync(process.execPath, ["index.ts", ...args], { encoding: "utf8" });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /exactly one of --request-bucket or --request-queue/);
+  }
+});
+
+it("processes and acknowledges an SQS request with either storage strategy", () => {
+  const script = `
+    import { SQSClient, GetQueueUrlCommand, ReceiveMessageCommand, DeleteMessageCommand } from "@aws-sdk/client-sqs";
+    import { DynamoDBClient, PutItemCommand } from "@aws-sdk/client-dynamodb";
+    import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+    import { mockClient } from "aws-sdk-client-mock";
+    const events = [];
+    const queue = mockClient(SQSClient);
+    queue.on(GetQueueUrlCommand).callsFake(async ({ QueueName }) => {
+      events.push("queue:" + QueueName); return { QueueUrl: "queue-url" };
+    });
+    let received = false;
+    queue.on(ReceiveMessageCommand).callsFake(async ({ MaxNumberOfMessages }) => {
+      if (received) return { Messages: [] };
+      received = true;
+      events.push("receive:" + MaxNumberOfMessages);
+      return { Messages: [{ MessageId: "message", ReceiptHandle: "receipt",
+        Body: JSON.stringify({ type: "create", requestId: "r", widgetId: "w", owner: "Jane Doe" }) }] };
+    });
+    queue.on(DeleteMessageCommand).callsFake(async ({ ReceiptHandle }) => {
+      events.push("delete:" + ReceiptHandle);
+      setTimeout(() => process.emit("SIGINT"), 10);
+      return {};
+    });
+    mockClient(DynamoDBClient).on(PutItemCommand).callsFake(async ({ Item }) => {
+      events.push("dynamodb:" + Item.id.S); return {};
+    });
+    mockClient(S3Client).on(PutObjectCommand).callsFake(async ({ Key }) => {
+      events.push("s3:" + Key); return {};
+    });
+    process.argv = [process.execPath, "-q", "my-queue", ...JSON.parse(process.env.TEST_ARGS)];
+    process.on("beforeExit", () => console.log("TRACE " + JSON.stringify(events)));
+    await import("./index.ts");
+  `;
+  const cases = [
+    { args: [], storage: "dynamodb:w" },
+    { args: ["--storage", "s3", "-b", "widgets"], storage: "s3:widgets/jane-doe/w" },
+  ];
+  for (const { args, storage } of cases) {
+    const result = spawnSync(process.execPath, ["--input-type=module", "-e", script], {
+      encoding: "utf8", env: { ...process.env, TEST_ARGS: JSON.stringify(args) }, timeout: 10000,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.ok(result.stdout.includes(`TRACE ${JSON.stringify([
+      "queue:my-queue", "receive:10", storage, "delete:receipt",
+    ])}`), result.stdout);
   }
 });
 
