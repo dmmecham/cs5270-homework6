@@ -21,6 +21,65 @@ npm ci
 
 `npm ci` installs the exact versions from `package-lock.json`.
 
+## Docker and AWS
+
+Build the image from the project directory:
+
+```powershell
+docker build -t widget-consumer .
+docker run --rm widget-consumer --help
+```
+
+Pass the same consumer arguments after the image name. For example, on an EC2
+instance with an appropriate instance role:
+
+```powershell
+docker run --rm -e AWS_REGION=us-east-1 widget-consumer -q my-request-queue -t widgets
+```
+
+Docker options go before the image name; arguments after `widget-consumer` are
+passed directly to the consumer. For example, using an environment file:
+
+```powershell
+docker run --rm --env-file .env widget-consumer -r my-request-bucket -s s3 -b my-widget-bucket -p 250
+```
+
+The file must use the SDK's `AWS_SECRET_ACCESS_KEY` name, alongside
+`AWS_ACCESS_KEY_ID`, `AWS_SESSION_TOKEN` (for temporary credentials), and
+`AWS_REGION`. Keep credential files out of Git.
+
+To pass temporary AWS credentials from your PowerShell environment instead,
+set `AWS_ACCESS_KEY_ID`, `AWS_SECRET_KEY`, `AWS_SESSION_TOKEN`, and `AWS_REGION`
+on the host first, then run:
+
+```powershell
+$env:AWS_SECRET_ACCESS_KEY = $env:AWS_SECRET_KEY
+docker run --rm -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_SESSION_TOKEN -e AWS_REGION widget-consumer -q my-request-queue -t widgets
+```
+
+The AWS SDK expects `AWS_SECRET_ACCESS_KEY`, so the first line maps your
+`AWS_SECRET_KEY` variable to that name. Docker inherits the values without
+embedding them in the image. Credentials passed as environment variables may
+be visible to users who can inspect the container; do not commit them.
+
+For ECS, push the image to a registry such as Amazon ECR and configure the task
+definition to use the image. Set the container command to an argument array such
+as `["-q", "my-request-queue", "-t", "widgets"]`, set `AWS_REGION`, and attach
+the permissions listed above to the **task role**. Give the task network access
+to the relevant AWS services. An ECS execution role may also be needed to pull
+the image and send logs to CloudWatch.
+
+The container uses the AWS SDK credential provider chain; prefer an ECS task
+role or EC2 instance profile rather than baking credentials into the image.
+The image runs as a non-root user and writes logs to stdout by default. Configure
+the container logging driver to retain them. If using `--log-file`, select a
+writable mounted location to retain the file outside the container.
+
+The consumer exits after 30 seconds of inactivity. An ECS service configured
+to maintain a desired count will start another task after it exits; use a
+standalone task if that restart behavior is not wanted. Processing real
+requests deletes them from the configured source.
+
 ## Running
 
 ```
